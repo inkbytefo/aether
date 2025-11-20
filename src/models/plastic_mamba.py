@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from mamba_ssm import Mamba
-from mamba_ssm.modules.mamba_simple import Block
+# from mamba_ssm.modules.mamba_simple import Block # Unused and causing error
 from .plasticity import HebbianMemory
 from ..utils.config import ModelConfig
 
