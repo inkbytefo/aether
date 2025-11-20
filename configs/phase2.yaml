@@ -1,0 +1,22 @@
+model:
+  d_model: 256
+  n_layer: 4
+  vocab_size: 50257
+  ssm_cfg:
+    d_state: 16
+    d_conv: 4
+    expand: 2
+
+training:
+  batch_size: 8
+  learning_rate: 0.0005 # Lower LR for fine-tuning
+  max_steps: 2000 # Train longer for Phase 2
+  seed: 42
+  device: "cuda"
+
+data:
+  dataset_name: "mixed"
+  max_length: 512
+  dataset_paths:
+    - "data/processed/code"
+    - "data/processed/math"

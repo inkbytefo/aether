@@ -21,6 +21,7 @@ class TrainingConfig:
 class DataConfig:
     dataset_name: str
     max_length: int
+    dataset_paths: Optional[list] = None
 
 class Config:
     def __init__(self, config_path: str):

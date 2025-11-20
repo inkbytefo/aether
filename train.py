@@ -10,7 +10,7 @@ from src.utils.config import Config
 from src.models.mamba import MambaLLM
 from src.data.dataset import create_dataloaders
 
-def train(config_path: str):
+def train(config_path: str, resume_from: str = None):
     # Load Config
     cfg = Config.load(config_path)
     
@@ -19,18 +19,26 @@ def train(config_path: str):
     print(f"Using device: {device}")
 
     # Initialize WandB
-    wandb.init(project="AETHER-1", config=cfg.__dict__)
+    wandb.init(project="AETHER-1", config=cfg.__dict__, name=f"phase2-{os.path.basename(config_path)}")
 
     # Create DataLoaders
     print("Loading data...")
-    train_loader, val_loader, tokenizer = create_dataloaders(
-        batch_size=cfg.training.batch_size,
-        max_length=cfg.data.max_length
-    )
+    # Pass the full config object to create_dataloaders
+    train_loader, val_loader, tokenizer = create_dataloaders(cfg)
 
     # Initialize Model
     print("Initializing model...")
     model = MambaLLM(cfg.model).to(device)
+    
+    # Load Checkpoint if provided
+    if resume_from:
+        print(f"Loading checkpoint from {resume_from}...")
+        if os.path.exists(resume_from):
+            state_dict = torch.load(resume_from, map_location=device)
+            model.load_state_dict(state_dict)
+            print("✅ Checkpoint loaded.")
+        else:
+            print(f"⚠️ Checkpoint {resume_from} not found. Starting from scratch.")
     
     # Optimizer
     optimizer = optim.AdamW(model.parameters(), lr=cfg.training.learning_rate)
@@ -79,8 +87,9 @@ def train(config_path: str):
 
     # Save Model
     os.makedirs("models/saved", exist_ok=True)
-    torch.save(model.state_dict(), "models/saved/aether_phase1.pt")
-    print("Training complete. Model saved.")
+    save_name = "aether_phase2.pt" if "phase2" in config_path else "aether_phase1.pt"
+    torch.save(model.state_dict(), f"models/saved/{save_name}")
+    print(f"Training complete. Model saved to models/saved/{save_name}")
 
 def validate(model, val_loader, device, step):
     model.eval()
@@ -108,13 +117,14 @@ def validate(model, val_loader, device, step):
             total_loss += loss.item()
             steps += 1
             
-    avg_loss = total_loss / steps
+    avg_loss = total_loss / steps if steps > 0 else 0
     wandb.log({"val_loss": avg_loss, "step": step})
     print(f" [Validation] Step {step}: Loss {avg_loss:.4f}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/config.yaml")
+    parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
     args = parser.parse_args()
     
-    train(args.config)
+    train(args.config, args.resume_from)
