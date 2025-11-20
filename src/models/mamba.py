@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from mamba_ssm import MambaLMHeadModel
+from mamba_ssm.models.config_mamba import MambaConfig
 from ..utils.config import ModelConfig
 
 class MambaLLM(nn.Module):
@@ -8,20 +9,16 @@ class MambaLLM(nn.Module):
         super().__init__()
         self.config = config
         
-        # Initialize Mamba Backbone
-        # MambaLMHeadModel expects: d_model, n_layer, vocab_size
-        # We can pass other kwargs for SSM config if needed, but MambaLMHeadModel 
-        # usually takes a specific config object or kwargs. 
-        # For simplicity in this wrapper, we assume standard initialization.
-        
-        self.backbone = MambaLMHeadModel(
+        # Create MambaConfig
+        mamba_config = MambaConfig(
             d_model=config.d_model,
             n_layer=config.n_layer,
             vocab_size=config.vocab_size,
             ssm_cfg=config.ssm_cfg,
-            device=None, # Will be moved to device later
-            dtype=torch.float32, # Default to float32
         )
+        
+        # Initialize Mamba Backbone
+        self.backbone = MambaLMHeadModel(mamba_config)
 
     def forward(self, input_ids, position_ids=None, inference_params=None, num_last_tokens=0):
         """
