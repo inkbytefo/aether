@@ -8,6 +8,7 @@ class ModelConfig:
     n_layer: int
     vocab_size: int
     ssm_cfg: dict
+    use_plasticity: bool = False
 
 @dataclass
 class TrainingConfig:
