@@ -26,11 +26,14 @@ def prepare_phase1_tr():
     
     # OSCAR for Turkish foundation (web text)
     # Using streaming to avoid massive download
+    # OSCAR for Turkish foundation (web text)
+    # Using streaming to avoid massive download
     try:
-        ds_tr = load_dataset("oscar", "unshuffled_deduplicated_tr", split="train", streaming=True)
-    except:
-        print("⚠️ OSCAR not found or requires login. Falling back to 'wikipedia' (tr).")
-        ds_tr = load_dataset("wikipedia", "20220301.tr", split="train", streaming=True)
+        print("Attempting to load 'wikimedia/wikipedia' (tr)...")
+        ds_tr = load_dataset("wikimedia/wikipedia", "20231101.tr", split="train", streaming=True)
+    except Exception as e:
+        print(f"⚠️ Wikipedia failed: {e}. Falling back to 'allenai/c4' (tr).")
+        ds_tr = load_dataset("allenai/c4", "tr", split="train", streaming=True)
 
     # 2. Train Tokenizer
     if not os.path.exists(tokenizer_path):
