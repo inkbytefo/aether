@@ -71,6 +71,8 @@ class Tokenizer:
         try:
             self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=model_path)
             self._configure_special_tokens()
+            # Update vocab_size to match loaded tokenizer
+            self.vocab_size = self.tokenizer.vocab_size
             print(f"✅ Loaded tokenizer from {model_path}")
             print(f"   Vocab size: {self.tokenizer.vocab_size}")
         except Exception as e:
@@ -188,6 +190,15 @@ class Tokenizer:
             add_special_tokens=add_special_tokens
         )
         
+        # Validate token IDs are within vocab range
+        if return_tensors:
+            input_ids = encodings['input_ids']
+            max_id = input_ids.max().item()
+            if max_id >= self.vocab_size:
+                print(f"⚠️ WARNING: Token ID {max_id} exceeds vocab_size {self.vocab_size}")
+                print(f"   This will cause CUDA errors. Clamping to valid range.")
+                encodings['input_ids'] = torch.clamp(input_ids, 0, self.vocab_size - 1)
+        
         return encodings
     
     def _encode_char(
@@ -300,4 +311,6 @@ class Tokenizer:
     
     def __len__(self) -> int:
         """Return vocabulary size."""
-        return self.vocab_size
+        if self._char_fallback:
+            return self.vocab_size
+        return self.tokenizer.vocab_size if self.tokenizer else self.vocab_size

@@ -114,6 +114,19 @@ def main():
         print("✅ Checkpoint loaded.")
     else:
         print(f"⚠️ Checkpoint {args.checkpoint} not found! Using random weights.")
+    
+    # Validate vocab_size compatibility
+    model_vocab_size = cfg.model.vocab_size
+    tokenizer_vocab_size = len(tokenizer)
+    if model_vocab_size != tokenizer_vocab_size:
+        print(f"❌ CRITICAL ERROR: Vocab size mismatch!")
+        print(f"   Model expects: {model_vocab_size}")
+        print(f"   Tokenizer has: {tokenizer_vocab_size}")
+        print(f"   This will cause CUDA device-side assert errors.")
+        print(f"\n🔧 To fix this:")
+        print(f"   1. Retrain the tokenizer with vocab_size={model_vocab_size}")
+        print(f"   2. Or update config vocab_size to {tokenizer_vocab_size} and retrain model")
+        return
 
     # Interactive Loop
     if args.prompt:
