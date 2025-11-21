@@ -1,9 +1,13 @@
+## Developer: inkbytefo
+## Modified: 2025-11-21
+
 import torch
 import argparse
 from src.utils.config import Config
 from src.data.tokenizer import Tokenizer
 from src.models.plastic_mamba import PlasticMambaLLM
 from src.models.mamba import MambaLLM
+from mamba_ssm.utils.generation import InferenceParams
 import os
 
 def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40, device="cuda"):
@@ -14,14 +18,11 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
     batch_size = input_ids.shape[0]
     
     # Prepare inference params for stateful generation
-    # This dictionary will hold:
-    # 1. SSM State (managed by Mamba mixer)
-    # 2. Hebbian State (managed by PlasticMambaBlock)
-    inference_params = {
-        "max_seqlen": max_length + input_ids.shape[1],
-        "max_batch_size": batch_size,
-        "seqlen_offset": 0
-    }
+    # Use Mamba's InferenceParams class instead of dict
+    inference_params = InferenceParams(
+        max_seqlen=max_length + input_ids.shape[1],
+        max_batch_size=batch_size
+    )
     
     generated_ids = input_ids.clone()
     
@@ -41,8 +42,8 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
         
         generated_ids = torch.cat([generated_ids, next_token], dim=1)
         
-        # Update offset
-        inference_params["seqlen_offset"] += input_ids.shape[1]
+        # Update offset for subsequent passes
+        inference_params.seqlen_offset += input_ids.shape[1]
         
         # Generation Loop
         for _ in range(max_length - 1):
@@ -59,11 +60,11 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
             next_token = torch.multinomial(probs, num_samples=1)
             
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
-            inference_params["seqlen_offset"] += 1
+            inference_params.seqlen_offset += 1
             
             # Stop if EOS (optional)
-            # if next_token.item() == tokenizer.eos_token_id:
-            #     break
+            if next_token.item() == tokenizer.eos_token_id:
+                break
                 
     return tokenizer.decode(generated_ids[0])
 
@@ -116,18 +117,12 @@ def main():
             if user_input.lower() in ["exit", "quit"]:
                 break
             
-            # Format prompt to encourage reasoning if not present
-            if "Question:" not in user_input:
-                prompt = f"Question: {user_input} Answer: <think>"
-            else:
-                prompt = user_input
+            # Use input directly without formatting
+            prompt = user_input
                 
             print("Thinking...", end="\r")
             response = generate(model, tokenizer, prompt, device=device)
             
-            # Clean up response for display
-            # If we added <think>, the model continues from there.
-            # We want to show the full generation.
             print(f"\n🤖 AETHER:\n{response}")
 
 if __name__ == "__main__":
