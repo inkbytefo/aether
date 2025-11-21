@@ -84,8 +84,9 @@ def train(config_path: str, resume_from: str = None):
         else:
             print(f"⚠️ Checkpoint {resume_from} not found. Starting from scratch.")
     
-    # Optimizer
+    # Optimizer & Scaler
     optimizer = optim.AdamW(model.parameters(), lr=cfg.training.learning_rate)
+    scaler = torch.cuda.amp.GradScaler()
     
     # Training Loop
     model.train()
@@ -102,40 +103,40 @@ def train(config_path: str, resume_from: str = None):
             input_ids = batch['input_ids'].to(device)
             labels = batch['labels'].to(device)
             
-            # Forward pass
-            outputs = model(input_ids)
-            logits = outputs.logits
+            # Forward pass with AMP
+            with torch.cuda.amp.autocast(dtype=torch.float16):
+                outputs = model(input_ids)
+                logits = outputs.logits
+                
+                # Calculate Loss
+                # Shift so that tokens < n predict n
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+                
+                loss_fct = torch.nn.CrossEntropyLoss()
+                main_loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+                
+                # Auxiliary Loss: Z-Loss
+                z_loss_weight = 2e-4
+                log_z = torch.logsumexp(logits, dim=-1)
+                aux_loss = z_loss_weight * (log_z ** 2).mean()
+                
+                loss = main_loss + aux_loss
+                
+                # Gradient Accumulation
+                loss = loss / cfg.training.gradient_accumulation_steps
             
-            # Calculate Loss
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            
-            loss_fct = torch.nn.CrossEntropyLoss()
-            main_loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            
-            # Auxiliary Loss: Z-Loss (Stabilizes Logits)
-            # Encourages log(sum(exp(logits))) to be close to 0
-            # This prevents logits from drifting too high, which causes instability in fp16/bf16
-            z_loss_weight = 2e-4
-            log_z = torch.logsumexp(logits, dim=-1)
-            aux_loss = z_loss_weight * (log_z ** 2).mean()
-            
-            # Note: Span-Based Loss (masking roots) requires a morphological parser at runtime.
-            # For Phase 1, we rely on the Unigram tokenizer's subword regularization 
-            # and Z-Loss for stability.
-            
-            loss = main_loss + aux_loss
-            
-            # Gradient Accumulation
-            loss = loss / cfg.training.gradient_accumulation_steps
-            
-            # Backward pass
-            loss.backward()
+            # Backward pass with Scaler
+            scaler.scale(loss).backward()
             
             # Optimizer Step (only every N steps)
             if (micro_step + 1) % cfg.training.gradient_accumulation_steps == 0:
-                optimizer.step()
+                # Unscale and Clip Grads
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.training.max_grad_norm)
+                
+                scaler.step(optimizer)
+                scaler.update()
                 optimizer.zero_grad()
                 
                 # Logging
