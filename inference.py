@@ -10,7 +10,7 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
     model.eval()
     
     # Encode prompt
-    input_ids = tokenizer.tokenizer(prompt, return_tensors="pt")['input_ids'].to(device)
+    input_ids = tokenizer.encode(prompt).to(device)
     batch_size = input_ids.shape[0]
     
     # Prepare inference params for stateful generation
@@ -80,7 +80,12 @@ def main():
     print(f"Using device: {device}")
     
     # Initialize Tokenizer
-    tokenizer = Tokenizer(max_length=cfg.data.max_length)
+    tokenizer_path = "data/phase1_tr/tokenizer.json"
+    if os.path.exists(tokenizer_path):
+        tokenizer = Tokenizer(model_path=tokenizer_path, max_length=cfg.data.max_length)
+    else:
+        print("⚠️ Custom tokenizer not found, using fallback (this may not work correctly)")
+        tokenizer = Tokenizer(max_length=cfg.data.max_length)
     
     # Initialize Model
     print("Initializing model...")
