@@ -18,6 +18,7 @@ pip install sentencepiece datasets wandb mamba-ssm causal-conv1d
 
 # 3. Prepare Data & Tokenizer
 echo "morphology 🧠 Preparing Turkish Corpus & Tokenizer..."
+export PYTHONPATH=$PYTHONPATH:.
 python src/data/prepare_tr_corpus.py --output_dir data/corpus_v1 --vocab_size 50257
 
 # 4. Run Training

@@ -2,6 +2,14 @@
 ## Modified: 2025-11-21
 
 import os
+import os
+import sys
+
+# Add project root to sys.path to allow imports from src
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import argparse
 from datasets import load_dataset
 from tqdm import tqdm
