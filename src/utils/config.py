@@ -9,6 +9,10 @@ class ModelConfig:
     vocab_size: int
     ssm_cfg: dict
     use_plasticity: bool = False
+    rms_norm: bool = True
+    residual_in_fp32: bool = True
+    fused_add_norm: bool = True
+    pad_vocab_size_multiple: int = 8
 
 @dataclass
 class TrainingConfig:
@@ -17,12 +21,21 @@ class TrainingConfig:
     max_steps: int
     seed: int
     device: str
+    sequence_len: int = 2048
+    min_lr: float = 1e-5
+    warmup_steps: int = 1000
+    weight_decay: float = 0.1
+    gradient_accumulation_steps: int = 1
+    max_grad_norm: float = 1.0
 
 @dataclass
 class DataConfig:
     dataset_name: str
     max_length: int
     dataset_paths: Optional[list] = None
+    tokenizer_path: str = "data/tokenizer.model"
+    train_split: float = 0.9
+    num_workers: int = 4
 
 class Config:
     def __init__(self, config_path: str):
