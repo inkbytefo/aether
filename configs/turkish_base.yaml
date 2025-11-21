@@ -3,7 +3,7 @@ model:
   n_layer: 24
   vocab_size: 50257
   ssm_cfg:
-    d_state: 32
+    d_state: 32      # Expanded state for Turkish morphology
     expand: 2
     dt_rank: "auto"
     d_conv: 4
@@ -19,6 +19,7 @@ model:
   residual_in_fp32: true
   fused_add_norm: true
   pad_vocab_size_multiple: 8
+  use_plasticity: false # Disabled for Phase 1
 
 training:
   batch_size: 32
@@ -30,8 +31,15 @@ training:
   gradient_accumulation_steps: 1
   max_grad_norm: 1.0
   seed: 42
-  
+  max_steps: 10000 # Define max steps for training loop
+  device: "cuda"
+
 data:
-  tokenizer_path: "data/tokenizer.model" # Placeholder, will be updated after training
+  dataset_name: "phase1_tr"
+  dataset_paths: 
+    - "data/corpus_v1/train.bin"
+    - "data/corpus_v1/val.bin"
+  tokenizer_path: "data/corpus_v1/tokenizer.model"
   train_split: 0.9
   num_workers: 4
+  max_length: 2048
