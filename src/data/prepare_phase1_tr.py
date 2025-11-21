@@ -1,8 +1,13 @@
 import os
+import sys
 import torch
 import numpy as np
 from datasets import load_dataset
 from tqdm import tqdm
+
+# Add project root to sys.path to allow importing src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
 from src.data.tokenizer import Tokenizer
 
 def prepare_phase1_tr():
