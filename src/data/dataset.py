@@ -113,13 +113,18 @@ def create_dataloaders(
     tokenizer: Optional[Tokenizer] = None
 ):
     # Initialize tokenizer if not provided
-    # Check if we have a custom tokenizer path in data config or default
-    tokenizer_path = "data/phase1_tr/tokenizer.json"
+    # Initialize tokenizer if not provided
     if tokenizer is None:
+        tokenizer_path = getattr(config.data, "tokenizer_path", "data/tokenizer.model")
         if os.path.exists(tokenizer_path):
+            print(f"Loading tokenizer from {tokenizer_path}")
             tokenizer = Tokenizer(model_path=tokenizer_path, max_length=config.data.max_length)
         else:
-            tokenizer = Tokenizer(max_length=config.data.max_length)
+            print(f"Warning: Tokenizer not found at {tokenizer_path}. Using default/empty tokenizer.")
+            # This might fail if Tokenizer requires a model_path. 
+            # Our new Tokenizer DOES require a model_path.
+            # So we should probably raise an error or try to find it.
+            raise FileNotFoundError(f"Tokenizer model not found at {tokenizer_path}. Please run prepare_tr_corpus.py first.")
     
     if config.data.dataset_name == "roneneldan/TinyStories":
         train_dataset = TinyStoriesDataset(split="train", tokenizer=tokenizer, max_length=config.data.max_length)

@@ -25,6 +25,11 @@ def train(config_path: str, resume_from: str = None):
     print("Loading data...")
     # Pass the full config object to create_dataloaders
     train_loader, val_loader, tokenizer = create_dataloaders(cfg)
+    
+    # CRITICAL: Sync vocab size
+    if len(tokenizer) != cfg.model.vocab_size:
+        print(f"⚠️ Config vocab_size ({cfg.model.vocab_size}) does not match Tokenizer ({len(tokenizer)}). Updating config.")
+        cfg.model.vocab_size = len(tokenizer)
 
     # Initialize Model
     print("Initializing model...")
@@ -106,7 +111,18 @@ def train(config_path: str, resume_from: str = None):
             shift_labels = labels[..., 1:].contiguous()
             
             loss_fct = torch.nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            main_loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            
+            # Auxiliary Loss (Span-Based / Morphological)
+            # For now, we implement a placeholder that can be expanded.
+            # Idea: Penalize high entropy on specific morphological markers if we had labels.
+            # Or simple Z-loss for stability: log(z)^2
+            aux_loss = 0.0
+            # z_loss_weight = 1e-4
+            # log_z = torch.logsumexp(logits, dim=-1)
+            # aux_loss = z_loss_weight * (log_z ** 2).mean()
+            
+            loss = main_loss + aux_loss
             
             # Backward pass
             optimizer.zero_grad()
@@ -114,8 +130,8 @@ def train(config_path: str, resume_from: str = None):
             optimizer.step()
             
             # Logging
-            wandb.log({"train_loss": loss.item(), "step": step})
-            pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+            wandb.log({"train_loss": main_loss.item(), "aux_loss": getattr(aux_loss, 'item', lambda: 0)(), "step": step})
+            pbar.set_postfix({"loss": f"{main_loss.item():.4f}"})
             pbar.update(1)
             step += 1
             
