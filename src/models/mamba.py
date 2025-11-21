@@ -19,6 +19,12 @@ class MambaLLM(nn.Module):
         
         # Initialize Mamba Backbone
         self.backbone = MambaLMHeadModel(mamba_config)
+        
+        # Note: We rely on Mamba's implicit state for position awareness.
+        # Explicit positional embeddings (RoPE/Learned) are difficult to inject 
+        # into the pre-packaged MambaLMHeadModel without significant overriding.
+        # For Phase 1, the SSM state is sufficient for Turkish morphology.
+
 
     def forward(self, input_ids, position_ids=None, inference_params=None, num_last_tokens=0):
         """

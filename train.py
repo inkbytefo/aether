@@ -113,14 +113,16 @@ def train(config_path: str, resume_from: str = None):
             loss_fct = torch.nn.CrossEntropyLoss()
             main_loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             
-            # Auxiliary Loss (Span-Based / Morphological)
-            # For now, we implement a placeholder that can be expanded.
-            # Idea: Penalize high entropy on specific morphological markers if we had labels.
-            # Or simple Z-loss for stability: log(z)^2
-            aux_loss = 0.0
-            # z_loss_weight = 1e-4
-            # log_z = torch.logsumexp(logits, dim=-1)
-            # aux_loss = z_loss_weight * (log_z ** 2).mean()
+            # Auxiliary Loss: Z-Loss (Stabilizes Logits)
+            # Encourages log(sum(exp(logits))) to be close to 0
+            # This prevents logits from drifting too high, which causes instability in fp16/bf16
+            z_loss_weight = 2e-4
+            log_z = torch.logsumexp(logits, dim=-1)
+            aux_loss = z_loss_weight * (log_z ** 2).mean()
+            
+            # Note: Span-Based Loss (masking roots) requires a morphological parser at runtime.
+            # For Phase 1, we rely on the Unigram tokenizer's subword regularization 
+            # and Z-Loss for stability.
             
             loss = main_loss + aux_loss
             
