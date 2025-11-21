@@ -10,12 +10,16 @@ from src.models.mamba import MambaLLM
 from mamba_ssm.utils.generation import InferenceParams
 import os
 
-def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40, device="cuda"):
+def generate(model, tokenizer, prompt, max_length=500, temperature=0.7, top_k=40, device="cuda", debug=False):
     model.eval()
     
     # Encode prompt
     input_ids = tokenizer.encode(prompt).to(device)
     batch_size = input_ids.shape[0]
+    
+    if debug:
+        print(f"\n[DEBUG] Input length: {input_ids.shape[1]} tokens")
+        print(f"[DEBUG] Will generate up to {max_length} new tokens")
     
     # Prepare inference params for stateful generation
     # Use Mamba's InferenceParams class instead of dict
@@ -46,7 +50,7 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
         inference_params.seqlen_offset += input_ids.shape[1]
         
         # Generation Loop
-        for _ in range(max_length - 1):
+        for step in range(max_length - 1):
             # Feed ONLY the last token
             # This is O(1) per step instead of O(L)
             outputs = model(next_token, inference_params=inference_params)
@@ -59,11 +63,16 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
             probs = torch.nn.functional.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
             
+            if debug and step < 5:
+                print(f"[DEBUG] Step {step}: Generated token {next_token.item()}")
+            
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
             inference_params.seqlen_offset += 1
             
             # Stop if EOS (optional)
             if next_token.item() == tokenizer.eos_token_id:
+                if debug:
+                    print(f"[DEBUG] EOS token hit at step {step}")
                 break
                 
     return tokenizer.decode(generated_ids[0])
@@ -121,7 +130,7 @@ def main():
             prompt = user_input
                 
             print("Thinking...", end="\r")
-            response = generate(model, tokenizer, prompt, device=device)
+            response = generate(model, tokenizer, prompt, device=device, debug=True)
             
             print(f"\n🤖 AETHER:\n{response}")
 
