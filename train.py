@@ -126,7 +126,20 @@ def train(config_path: str, resume_from: str = None):
 
     # Save Model
     os.makedirs("models/saved", exist_ok=True)
-    save_name = "aether_phase2.pt" if "phase2" in config_path else "aether_phase1.pt"
+    
+    # Determine save name based on config path
+    config_name = os.path.basename(config_path)
+    if "phase1" in config_name:
+        save_name = "aether_phase1.pt"
+    elif "phase2" in config_name:
+        save_name = "aether_phase2.pt"
+    elif "phase3" in config_name:
+        save_name = "aether_phase3.pt"
+    elif "phase4" in config_name:
+        save_name = "aether_phase4.pt"
+    else:
+        save_name = "aether_model.pt"
+        
     torch.save(model.state_dict(), f"models/saved/{save_name}")
     print(f"Training complete. Model saved to models/saved/{save_name}")
 

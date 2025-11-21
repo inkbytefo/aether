@@ -1,0 +1,22 @@
+model:
+  d_model: 256
+  n_layer: 4
+  vocab_size: 50257
+  ssm_cfg:
+    d_state: 16
+    d_conv: 4
+    expand: 2
+  use_plasticity: true
+
+training:
+  batch_size: 8
+  learning_rate: 0.0001
+  max_steps: 1000 # Short fine-tuning on reasoning
+  seed: 42
+  device: "cuda"
+
+data:
+  dataset_name: "mixed"
+  max_length: 512
+  dataset_paths:
+    - "data/processed/reasoning"
