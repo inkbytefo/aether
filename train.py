@@ -90,6 +90,7 @@ def train(config_path: str, resume_from: str = None):
     # Training Loop
     model.train()
     step = 0
+    micro_step = 0
     pbar = tqdm(total=cfg.training.max_steps, desc="Training")
     
     while step < cfg.training.max_steps:
@@ -126,21 +127,29 @@ def train(config_path: str, resume_from: str = None):
             
             loss = main_loss + aux_loss
             
+            # Gradient Accumulation
+            loss = loss / cfg.training.gradient_accumulation_steps
+            
             # Backward pass
-            optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
             
-            # Logging
-            wandb.log({"train_loss": main_loss.item(), "aux_loss": getattr(aux_loss, 'item', lambda: 0)(), "step": step})
-            pbar.set_postfix({"loss": f"{main_loss.item():.4f}"})
-            pbar.update(1)
-            step += 1
+            # Optimizer Step (only every N steps)
+            if (micro_step + 1) % cfg.training.gradient_accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                
+                # Logging
+                wandb.log({"train_loss": main_loss.item(), "aux_loss": getattr(aux_loss, 'item', lambda: 0)(), "step": step})
+                pbar.set_postfix({"loss": f"{main_loss.item():.4f}"})
+                pbar.update(1)
+                step += 1
+                
+                # Validation (every 100 steps)
+                if step % 100 == 0:
+                    validate(model, val_loader, device, step)
+                    model.train()
             
-            # Validation (every 100 steps)
-            if step % 100 == 0:
-                validate(model, val_loader, device, step)
-                model.train()
+            micro_step += 1
 
     # Save Model
     os.makedirs("models/saved", exist_ok=True)
