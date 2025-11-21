@@ -33,7 +33,7 @@ class Tokenizer:
             show_progress=True
         )
         
-        tokenizer.train(files, trainer)
+        tokenizer.train_from_iterator(files, trainer)
         tokenizer.save(save_path)
         
         # Reload as PreTrainedTokenizerFast for easy usage
