@@ -23,7 +23,7 @@ class TinyStoriesDataset(Dataset):
         return self._process_text(text)
 
     def _process_text(self, text):
-        encodings = self.tokenizer.encode(text)
+        encodings = self.tokenizer.encode(text, return_tensors=True, add_special_tokens=True)
         input_ids = encodings['input_ids'].squeeze(0)
         attention_mask = encodings['attention_mask'].squeeze(0)
         
@@ -67,7 +67,7 @@ class MixedDataset(Dataset):
 
     def __getitem__(self, idx):
         text = self.samples[idx]
-        encodings = self.tokenizer.encode(text)
+        encodings = self.tokenizer.encode(text, return_tensors=True, add_special_tokens=True)
         input_ids = encodings['input_ids'].squeeze(0)
         attention_mask = encodings['attention_mask'].squeeze(0)
         

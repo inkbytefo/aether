@@ -13,8 +13,9 @@ import os
 def generate(model, tokenizer, prompt, max_length=500, temperature=0.7, top_k=40, device="cuda", debug=False):
     model.eval()
     
-    # Encode prompt
-    input_ids = tokenizer.encode(prompt).to(device)
+    # Encode prompt - tokenizer returns dict with 'input_ids' and 'attention_mask'
+    encodings = tokenizer.encode(prompt, return_tensors=True, add_special_tokens=True)
+    input_ids = encodings['input_ids'].to(device)
     batch_size = input_ids.shape[0]
     
     if debug:
@@ -75,7 +76,7 @@ def generate(model, tokenizer, prompt, max_length=500, temperature=0.7, top_k=40
                     print(f"[DEBUG] EOS token hit at step {step}")
                 break
                 
-    return tokenizer.decode(generated_ids[0])
+    return tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 def main():
     parser = argparse.ArgumentParser()
