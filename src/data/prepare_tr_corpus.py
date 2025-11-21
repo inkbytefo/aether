@@ -37,7 +37,8 @@ def prepare_corpus(output_dir: str, vocab_size: int = 50257):
     print("   - Downloading Turkish Wikipedia...")
     # streaming=True to avoid massive RAM usage, but for tokenizer we need a file.
     # We'll take a subset for tokenizer training if full dataset is too big.
-    wiki = load_dataset("wikipedia", "20220301.tr", split="train", streaming=True)
+    # "wikipedia" script is deprecated, using "wikimedia/wikipedia"
+    wiki = load_dataset("wikimedia/wikipedia", "20231101.tr", split="train", streaming=True)
     
     # 2. Python Code (Reasoning)
     print("   - Downloading Python Code (The Stack/CodeSearchNet)...")
