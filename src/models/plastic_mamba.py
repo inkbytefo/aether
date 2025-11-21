@@ -14,6 +14,7 @@ class PlasticMambaBlock(nn.Module):
     def __init__(self, config: ModelConfig, layer_idx: int):
         super().__init__()
         self.config = config
+        self.layer_idx = layer_idx # Store layer_idx for state management
         
         # Standard Mamba Block (Mixer + Norm)
         # We use the Block class from mamba_ssm which encapsulates Mixer and Norm
@@ -45,7 +46,19 @@ class PlasticMambaBlock(nn.Module):
         # Hebbian Path
         residual = x
         x = self.norm_hebbian(x)
-        x, _ = self.hebbian(x) # We ignore state for now in simple forward
+        
+        # Manage Hebbian State
+        hebbian_state = None
+        if inference_params is not None:
+            hebbian_state = inference_params.get(f"hebbian_{self.layer_idx}", None)
+            
+        # We pass state explicitly. We do NOT pass inference_params to hebbian() 
+        # to avoid it writing to a global "hebbian_state" key.
+        x, new_state = self.hebbian(x, state=hebbian_state) 
+        
+        if inference_params is not None:
+            inference_params[f"hebbian_{self.layer_idx}"] = new_state
+            
         x = residual + x
         
         return x

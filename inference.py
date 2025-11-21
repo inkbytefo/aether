@@ -9,19 +9,48 @@ import os
 def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40, device="cuda"):
     model.eval()
     
-    # Encode prompt (without padding for inference)
+    # Encode prompt
     input_ids = tokenizer.tokenizer(prompt, return_tensors="pt")['input_ids'].to(device)
+    batch_size = input_ids.shape[0]
     
-    # Generation Loop
+    # Prepare inference params for stateful generation
+    # This dictionary will hold:
+    # 1. SSM State (managed by Mamba mixer)
+    # 2. Hebbian State (managed by PlasticMambaBlock)
+    inference_params = {
+        "max_seqlen": max_length + input_ids.shape[1],
+        "max_batch_size": batch_size,
+        "seqlen_offset": 0
+    }
+    
     generated_ids = input_ids.clone()
     
     with torch.no_grad():
-        for _ in range(max_length):
-            # Forward pass
-            outputs = model(generated_ids)
+        # First pass: Process the prompt
+        # The model will process the full prompt and initialize/update states in inference_params
+        outputs = model(input_ids, inference_params=inference_params)
+        logits = outputs.logits[:, -1, :] / temperature
+        
+        # Sample first new token
+        if top_k > 0:
+            v, _ = torch.topk(logits, top_k)
+            logits[logits < v[:, [-1]]] = -float('Inf')
+        
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+        
+        generated_ids = torch.cat([generated_ids, next_token], dim=1)
+        
+        # Update offset
+        inference_params["seqlen_offset"] += input_ids.shape[1]
+        
+        # Generation Loop
+        for _ in range(max_length - 1):
+            # Feed ONLY the last token
+            # This is O(1) per step instead of O(L)
+            outputs = model(next_token, inference_params=inference_params)
             logits = outputs.logits[:, -1, :] / temperature
             
-            # Top-k sampling
             if top_k > 0:
                 v, _ = torch.topk(logits, top_k)
                 logits[logits < v[:, [-1]]] = -float('Inf')
@@ -30,8 +59,9 @@ def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40
             next_token = torch.multinomial(probs, num_samples=1)
             
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
+            inference_params["seqlen_offset"] += 1
             
-            # Stop if EOS (optional, depending on tokenizer)
+            # Stop if EOS (optional)
             # if next_token.item() == tokenizer.eos_token_id:
             #     break
                 

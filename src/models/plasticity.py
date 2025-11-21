@@ -27,23 +27,76 @@ class HebbianMemory(nn.Module):
         # Output projection
         self.out_proj = nn.Linear(dim, dim)
         
-    def forward(self, x, state=None):
+    def forward(self, x, state=None, inference_params=None):
         """
         Args:
             x: Input tensor (batch, seq_len, dim)
-            state: Previous memory state (batch, dim, dim)
+            state: Previous memory state (batch, dim, dim) - DEPRECATED, use inference_params
+            inference_params: Dictionary to store state during generation
         """
         batch_size, seq_len, dim = x.shape
         
+        # Handle inference_params for stateful generation
+        if inference_params is not None:
+            # Check if we have a stored state for this layer
+            # We need a unique key for this layer. For now, let's assume the caller manages this
+            # or we use a simple key if this is the only Hebbian layer.
+            # Ideally, PlasticMambaBlock should pass the specific state for this layer.
+            # But here we receive 'state' directly if passed explicitly, or we look into inference_params.
+            
+            # If state is passed explicitly, use it (legacy support or direct control)
+            if state is None:
+                # Try to retrieve from inference_params
+                # We expect inference_params to be a dict where we can store/retrieve our state
+                # Key convention: "hebbian_state"
+                state = inference_params.get("hebbian_state", None)
+
         # Initialize state if not provided
         if state is None:
             state = torch.zeros(batch_size, dim, dim, device=x.device)
             
-        # We need to process sequentially to update state step-by-step
-        # For efficiency in training, we could use a custom CUDA kernel or linear attention formulation
-        # But for this prototype, we'll use a loop or a simplified associative scan if possible.
-        # For now, let's implement the loop version for clarity and correctness.
-        
+        # Optimization: If seq_len is 1 and we have state, we can do a fast update
+        if seq_len == 1:
+            k = self.w_key(x)   # (B, 1, D)
+            v = self.w_value(x) # (B, 1, D)
+            q = self.w_query(x) # (B, 1, D)
+            
+            # Read from memory
+            # q: (B, 1, D), state: (B, D, D) -> (B, 1, D)
+            memory_out = torch.bmm(q, state) # (B, 1, D)
+            
+            # Update memory
+            # k: (B, 1, D), v: (B, 1, D) -> (B, D, D)
+            update = torch.bmm(k.transpose(1, 2), v) # Note: k is (B, 1, D), so k.T is (B, D, 1). Wait.
+            # Original rule: A_{t+1} = lambda * A + eta * (x_t @ y_t^T)
+            # Here x_t is k_t, y_t is v_t.
+            # k_t: (B, D, 1) in loop. Here k is (B, 1, D).
+            # So we need k.transpose(1, 2) @ v ? No.
+            # In loop: k_t = k[:, t, :].unsqueeze(2) -> (B, D, 1)
+            #          v_t = v[:, t, :].unsqueeze(2) -> (B, D, 1)
+            #          update = k_t @ v_t.T -> (B, D, 1) @ (B, 1, D) -> (B, D, D)
+            
+            k_t = k.transpose(1, 2) # (B, D, 1)
+            v_t = v # (B, 1, D) - already in row vector form if we consider v_t^T
+            
+            # Let's match the loop logic exactly:
+            # update = torch.bmm(k_t, v_t.transpose(1, 2)) 
+            # Wait, in loop v_t was (B, D, 1).
+            # Here v is (B, 1, D). So v.transpose(1, 2) is (B, D, 1).
+            # So k_t @ v_t.T is (B, D, 1) @ (B, 1, D) -> (B, D, D). Correct.
+            
+            update = torch.bmm(k_t, v) 
+            
+            new_state = self.decay_rate * state + self.learning_rate * update
+            
+            # Save state back to inference_params if present
+            if inference_params is not None:
+                inference_params["hebbian_state"] = new_state
+                
+            out = self.out_proj(memory_out)
+            return out, new_state
+
+        # Sequential processing for training (or first step of inference)
         outputs = []
         current_state = state
         
@@ -70,4 +123,8 @@ class HebbianMemory(nn.Module):
         outputs = torch.stack(outputs, dim=1) # (B, L, D)
         
         # Final projection
+        # If inference_params is present, save the final state
+        if inference_params is not None:
+            inference_params["hebbian_state"] = current_state
+            
         return self.out_proj(outputs), current_state
