@@ -86,7 +86,7 @@ def train(config_path: str, resume_from: str = None):
     
     # Optimizer & Scaler
     optimizer = optim.AdamW(model.parameters(), lr=cfg.training.learning_rate)
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler('cuda')
     
     # Training Loop
     model.train()
@@ -104,7 +104,7 @@ def train(config_path: str, resume_from: str = None):
             labels = batch['labels'].to(device)
             
             # Forward pass with AMP
-            with torch.cuda.amp.autocast(dtype=torch.float16):
+            with torch.amp.autocast('cuda', dtype=torch.float16):
                 outputs = model(input_ids)
                 logits = outputs.logits
                 
