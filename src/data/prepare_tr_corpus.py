@@ -41,9 +41,9 @@ def prepare_corpus(output_dir: str, vocab_size: int = 50257):
     wiki = load_dataset("wikimedia/wikipedia", "20231101.tr", split="train", streaming=True)
     
     # 2. Python Code (Reasoning)
-    print("   - Downloading Python Code (bigcode/the-stack-smol)...")
-    # code_search_net is deprecated/broken. Using the-stack-smol which is high quality.
-    code = load_dataset("bigcode/the-stack-smol", data_dir="data/python", split="train", streaming=True)
+    print("   - Downloading Python Code (codeparrot/codeparrot-clean)...")
+    # codeparrot-clean is ungated and high quality.
+    code = load_dataset("codeparrot/codeparrot-clean", split="train", streaming=True)
     
     # 3. Math (GSM8K)
     print("   - Downloading GSM8K (Math)...")
