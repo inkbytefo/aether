@@ -83,22 +83,25 @@ class Tokenizer:
         """Configure special tokens for the tokenizer."""
         if not self.tokenizer:
             return
-            
-        special_tokens = {
-            'pad_token': self.PAD_TOKEN,
-            'unk_token': self.UNK_TOKEN,
-            'bos_token': self.BOS_TOKEN,
-            'eos_token': self.EOS_TOKEN,
+        
+        # Validate that special tokens are within valid range
+        special_tokens_info = {
+            'pad_token': (self.PAD_TOKEN, self.tokenizer.pad_token_id),
+            'unk_token': (self.UNK_TOKEN, self.tokenizer.unk_token_id),
+            'bos_token': (self.BOS_TOKEN, self.tokenizer.bos_token_id),
+            'eos_token': (self.EOS_TOKEN, self.tokenizer.eos_token_id),
         }
         
-        # Only add tokens that don't exist
-        tokens_to_add = {}
-        for key, token in special_tokens.items():
-            if getattr(self.tokenizer, key, None) is None:
-                tokens_to_add[key] = token
+        # Check if any special tokens are out of bounds
+        has_invalid = False
+        for key, (token, token_id) in special_tokens_info.items():
+            if token_id is not None and token_id >= self.tokenizer.vocab_size:
+                has_invalid = True
+                print(f"   ⚠️ {key} ID {token_id} is out of bounds (vocab_size={self.tokenizer.vocab_size})")
         
-        if tokens_to_add:
-            self.tokenizer.add_special_tokens(tokens_to_add)
+        if has_invalid:
+            print(f"   ❌ Tokenizer has invalid special token IDs!")
+            print(f"   🔧 Solution: Retrain tokenizer with: python retrain_tokenizer.py")
         
         # Set padding side and truncation
         self.tokenizer.padding_side = 'right'
