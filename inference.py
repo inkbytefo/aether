@@ -9,8 +9,8 @@ import os
 def generate(model, tokenizer, prompt, max_length=200, temperature=0.7, top_k=40, device="cuda"):
     model.eval()
     
-    # Encode prompt
-    input_ids = tokenizer.encode(prompt)['input_ids'].to(device).unsqueeze(0)
+    # Encode prompt (without padding for inference)
+    input_ids = tokenizer.tokenizer(prompt, return_tensors="pt")['input_ids'].to(device)
     
     # Generation Loop
     generated_ids = input_ids.clone()
