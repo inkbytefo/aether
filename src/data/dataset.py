@@ -151,7 +151,7 @@ def create_dataloaders(
         train_dataset,
         batch_size=config.training.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=2,  # Reduced to avoid worker warning
         pin_memory=True
     )
     
@@ -159,7 +159,7 @@ def create_dataloaders(
         val_dataset,
         batch_size=config.training.batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=2,  # Reduced to avoid worker warning
         pin_memory=True
     )
     
