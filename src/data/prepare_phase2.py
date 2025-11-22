@@ -52,24 +52,28 @@ def prepare_phase2():
             print(f"  ✅ Loaded {cfg['name']}")
         except Exception as e:
             print(f"  ⚠️ Failed to load {cfg['name']}: {e}")
-            # Adjust ratios if one fails? For now just skip
-            
+    
     if not iterators:
         print("❌ No datasets loaded!")
         return
 
-    # Tokenization Loop
-    all_tokens = []
-    pbar = tqdm(total=TOTAL_TOKENS, desc="Mixing & Tokenizing")
+    # Streaming setup
+    train_file = open(train_bin_path, "wb")
+    val_file = open(val_bin_path, "wb")
     
-    while len(all_tokens) < TOTAL_TOKENS:
-        # Probabilistic sampling based on ratios
+    split_idx = int(TOTAL_TOKENS * 0.95)
+    current_tokens = 0
+    buffer = []
+    BUFFER_SIZE = 1000000 # 1M tokens buffer
+    
+    pbar = tqdm(total=TOTAL_TOKENS, desc="Mixing & Streaming")
+    
+    while current_tokens < TOTAL_TOKENS:
+        # Probabilistic sampling
         ratios = [it["ratio"] for it in iterators]
-        # Normalize ratios in case some failed
         total_ratio = sum(ratios)
         probs = [r / total_ratio for r in ratios]
         
-        # Pick a dataset
         chosen_idx = np.random.choice(len(iterators), p=probs)
         chosen = iterators[chosen_idx]
         
@@ -77,40 +81,61 @@ def prepare_phase2():
             item = next(chosen["iter"])
             text = item[chosen["key"]]
             
-            # For GSM8K, append answer if available
             if chosen["name"] == "gsm8k":
                 text += "\nAnswer: " + item["answer"]
             
-            # Encode
             enc = tokenizer.encode(text, return_tensors=False)
             ids = enc['input_ids']
-            if isinstance(ids[0], list): ids = ids[0] # Flatten
+            if isinstance(ids[0], list): ids = ids[0]
             
-            all_tokens.extend(ids)
-            pbar.update(len(ids))
+            buffer.extend(ids)
             
+            # Flush buffer if full
+            if len(buffer) >= BUFFER_SIZE:
+                chunk = buffer[:BUFFER_SIZE]
+                buffer = buffer[BUFFER_SIZE:]
+                
+                chunk_arr = np.array(chunk, dtype=np.uint16)
+                
+                if current_tokens < split_idx:
+                    space_in_train = split_idx - current_tokens
+                    if len(chunk) <= space_in_train:
+                        train_file.write(chunk_arr.tobytes())
+                    else:
+                        train_part = chunk_arr[:space_in_train]
+                        val_part = chunk_arr[space_in_train:]
+                        train_file.write(train_part.tobytes())
+                        val_file.write(val_part.tobytes())
+                else:
+                    val_file.write(chunk_arr.tobytes())
+                
+                current_tokens += len(chunk)
+                pbar.update(len(chunk))
+                
         except StopIteration:
-            # Restart iterator? Or just remove?
-            # For streaming, StopIteration means end of stream. 
-            # Let's try to reload or just ignore (dataset exhausted)
-            print(f"  ⚠️ Dataset {chosen['name']} exhausted.")
             del iterators[chosen_idx]
             if not iterators:
                 break
-            
+    
+    # Flush remaining buffer
+    if buffer:
+        chunk_arr = np.array(buffer, dtype=np.uint16)
+        if current_tokens < split_idx:
+            space_in_train = split_idx - current_tokens
+            if len(buffer) <= space_in_train:
+                train_file.write(chunk_arr.tobytes())
+            else:
+                train_part = chunk_arr[:space_in_train]
+                val_part = chunk_arr[space_in_train:]
+                train_file.write(train_part.tobytes())
+                val_file.write(val_part.tobytes())
+        else:
+            val_file.write(chunk_arr.tobytes())
+        pbar.update(len(buffer))
+
     pbar.close()
-    
-    # Save
-    n = len(all_tokens)
-    split = int(n * 0.95) # 95% train, 5% val for Phase 2
-    
-    print(f"Saving {split} training tokens...")
-    train_data = np.array(all_tokens[:split], dtype=np.uint16)
-    train_data.tofile(train_bin_path)
-    
-    print(f"Saving {n - split} validation tokens...")
-    val_data = np.array(all_tokens[split:], dtype=np.uint16)
-    val_data.tofile(val_bin_path)
+    train_file.close()
+    val_file.close()
     
     print(f"✅ Phase 2 Data Ready: {output_dir}")
 
