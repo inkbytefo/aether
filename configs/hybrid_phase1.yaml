@@ -16,7 +16,7 @@ model:
   use_plasticity: false
   
   # Hybrid-specific
-  attention_interval: 3  # Every 3rd layer is Linear Attention
+  attention_interval: 999  # TEMPORARILY DISABLED (was 3) - debugging NaN loss
 
 data:
   train_path: "data/corpus_v1/train.bin"
