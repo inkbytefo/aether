@@ -58,13 +58,10 @@ class LinearAttentionBlock(nn.Module):
         V = self.v_proj(x).view(B, L, self.num_heads, self.head_dim).transpose(1, 2)
         
         # Linear Attention: O(L * D^2)
-        # Instead of: Attn = softmax(Q @ K^T) @ V -> O(L^2 * D)
-        # We use: Out = Q @ (K^T @ V) -> O(L * D^2)
-        
-        # Normalize K and Q (replace softmax with feature maps)
-        # For simplicity, use ELU+1 as feature map (guarantees positivity)
-        Q = torch.nn.functional.elu(Q) + 1  # (B, H, L, D_h)
-        K = torch.nn.functional.elu(K) + 1
+        # Use ELU+1 as feature map (guarantees positivity)
+        eps = 1e-6
+        Q = torch.nn.functional.elu(Q) + 1 + eps  # (B, H, L, D_h)
+        K = torch.nn.functional.elu(K) + 1 + eps
         
         # Compute KV: (K^T @ V)
         KV = torch.einsum('bhld,bhle->bhde', K, V)  # (B, H, D_h, D_h)
@@ -72,9 +69,11 @@ class LinearAttentionBlock(nn.Module):
         # Compute QKV: Q @ (K^T @ V)
         out = torch.einsum('bhld,bhde->bhle', Q, KV)  # (B, H, L, D_h)
         
-        # Normalize by sum of keys (to mimic softmax normalization)
-        K_sum = K.sum(dim=2, keepdim=True)  # (B, H, 1, D_h)
-        out = out / (torch.einsum('bhld,bhld->bhl', Q, K_sum).unsqueeze(-1) + 1e-6)
+        # Normalize by sum of keys (improved stability)
+        K_sum = K.sum(dim=2, keepdim=True) + eps  # (B, H, 1, D_h)
+        normalizer = torch.einsum('bhld,bhld->bhl', Q, K_sum).unsqueeze(-1) + eps
+        normalizer = torch.clamp(normalizer, min=eps)  # Prevent division by zero
+        out = out / normalizer
         
         # Merge heads
         out = out.transpose(1, 2).contiguous().view(B, L, D)
