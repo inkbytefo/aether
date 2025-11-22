@@ -74,7 +74,7 @@ def prepare_phase1_tr_optimized():
     # 3. Tokenize with Memmap (no RAM overflow)
     print("Tokenizing and Saving Data (Memmap Streaming)...")
     
-    max_tokens = 100_000_000  # 100M tokens target
+    max_tokens = 50_000_000   # 50M tokens target (T4 optimized - was 100M)
     chunk_size = 1_000_000    # Write 1M tokens at a time
     
     # Create temporary memmap file
