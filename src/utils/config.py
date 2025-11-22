@@ -9,6 +9,7 @@ class ModelConfig:
     vocab_size: int
     ssm_cfg: dict
     use_plasticity: bool = False
+    hebbian_cfg: dict = None
     rms_norm: bool = True
     residual_in_fp32: bool = True
     fused_add_norm: bool = True
