@@ -113,10 +113,10 @@ model:
     decay_rate: 0.9
 
 training:
-  batch_size: 8
+  batch_size: 2
   learning_rate: 0.0003  # Daha düşük (plasticity için stable)
   max_steps: 50000  # 10K'dan artırıldı
-  gradient_accumulation_steps: 16
+  gradient_accumulation_steps: 64
   warmup_steps: 1000
 ```
 
@@ -189,13 +189,13 @@ def fibonacci(n):
 ### Hazırlık (Phase 1 → Phase 2 Geçiş)
 
 - [x] Phase 1 checkpoint kaydedildi (`aether_phase1.pt`)
-- [ ] Phase 2 config oluştur (`configs/phase2_tr.yaml`)
-- [ ] Data preparation script güncelle (Code + Math datasets ekle)
-- [ ] PlasticMambaLLM test et (forward pass, gradient flow)
+- [x] Phase 2 config oluştur (`configs/phase2_tr.yaml`)
+- [x] Data preparation script güncelle (Code + Math datasets ekle)
+- [x] PlasticMambaLLM test et (forward pass, gradient flow)
 
 ### Eğitim
 
-- [ ] Stage 1: Hebbian frozen training (10K steps)
+- [x] Stage 1: Hebbian frozen training (Started)
 - [ ] Stage 2: Full plasticity training (20K steps)
 - [ ] Stage 3: Refinement (20K steps)
 - [ ] Checkpoint her 5K step'te kaydet
