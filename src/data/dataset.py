@@ -160,9 +160,10 @@ def create_dataloaders(
         val_dataset,
         batch_size=config.training.batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=4,  # ↑ 2x for faster I/O
         persistent_workers=True,
-        pin_memory=True
+        pin_memory=True,
+        prefetch_factor=2
     )
     
     return train_loader, val_loader, tokenizer

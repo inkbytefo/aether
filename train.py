@@ -33,11 +33,21 @@ def train(config_path: str, resume_from: str = None):
 
     # Initialize Model
     print("Initializing model...")
-    if cfg.model.use_plasticity:
+    
+    # Detect model type from config
+    if hasattr(cfg.model, 'attention_interval'):
+        # Hybrid Mamba-Attention architecture
+        from src.models.hybrid_mamba import HybridMambaLLM
+        print("🌀 Using HybridMambaLLM (Jamba-style: Mamba + Linear Attention)")
+        model = HybridMambaLLM(cfg.model).to(device)
+    elif cfg.model.use_plasticity:
+        # Legacy Plastic Mamba (deprecated)
         from src.models.plastic_mamba import PlasticMambaLLM
-        print("🧠 Using PlasticMambaLLM with Hebbian Memory")
+        print("⚠️ Using PlasticMambaLLM (Legacy - not recommended)")
         model = PlasticMambaLLM(cfg.model).to(device)
     else:
+        # Standard Mamba
+        print("🐍 Using Standard MambaLLM")
         model = MambaLLM(cfg.model).to(device)
     
     # Load Checkpoint if provided
