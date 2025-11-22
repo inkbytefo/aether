@@ -129,7 +129,7 @@ def create_dataloaders(
     if config.data.dataset_name == "roneneldan/TinyStories":
         train_dataset = TinyStoriesDataset(split="train", tokenizer=tokenizer, max_length=config.data.max_length)
         val_dataset = TinyStoriesDataset(split="validation", tokenizer=tokenizer, max_length=config.data.max_length)
-    elif config.data.dataset_name == "phase1_tr":
+    elif config.data.dataset_name in ["phase1_tr", "phase2_mixed"]:
         # Use BinaryDataset for our custom pre-processed data
         train_path = config.data.dataset_paths[0]
         val_path = config.data.dataset_paths[1]
