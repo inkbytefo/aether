@@ -91,11 +91,19 @@ def main():
     print(f"Using device: {device}")
     
     # Initialize Tokenizer
-    tokenizer_path = "data/phase1_tr/tokenizer.json"
+    # Initialize Tokenizer
+    # Check config first, then default paths
+    tokenizer_path = getattr(cfg.data, "tokenizer_path", "data/corpus_v1/tokenizer.model")
+    
+    if not os.path.exists(tokenizer_path):
+        # Fallback to old path
+        tokenizer_path = "data/phase1_tr/tokenizer.json"
+        
     if os.path.exists(tokenizer_path):
+        print(f"Loading tokenizer from {tokenizer_path}")
         tokenizer = Tokenizer(model_path=tokenizer_path, max_length=cfg.data.max_length)
     else:
-        print("⚠️ Custom tokenizer not found, using fallback (this may not work correctly)")
+        print(f"⚠️ Tokenizer not found at {tokenizer_path}, using fallback (this may not work correctly)")
         tokenizer = Tokenizer(max_length=cfg.data.max_length)
     
     # Initialize Model

@@ -1,0 +1,30 @@
+model:
+  d_model: 256  # Phase 1 ile aynı (checkpoint yükleyebilmek için)
+  n_layer: 6    # Phase 1 ile aynı
+  vocab_size: 50257
+  ssm_cfg:
+    d_state: 16
+    d_conv: 4
+    expand: 2
+  use_plasticity: true  # Hebbian Plasticity AKTİF
+  hebbian_cfg:
+    learning_rate: 0.1
+    decay_rate: 0.9
+
+training:
+  batch_size: 8
+  learning_rate: 0.0003  # Phase 1'den biraz daha düşük
+  max_steps: 20000       # Phase 2 için 20K step (toplam 30K olacak)
+  seed: 42
+  device: "cuda"
+  gradient_accumulation_steps: 16
+  max_grad_norm: 1.0
+  warmup_steps: 1000
+
+data:
+  dataset_name: "phase2_mix"
+  max_length: 512
+  tokenizer_path: "data/corpus_v1/tokenizer.model"
+  dataset_paths:
+    - "data/corpus_v1/train.bin"  # Şimdilik Phase 1 verisiyle devam (Stage 1)
+    - "data/corpus_v1/val.bin"
