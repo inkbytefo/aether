@@ -91,6 +91,8 @@ class HybridBlock(nn.Module):
         self.block_type = block_type
         
         if block_type == 'mamba':
+            if not MAMBA_AVAILABLE:
+                raise ImportError("mamba_ssm is required for Mamba blocks. Install with: pip install mamba-ssm")
             self.mixer = Mamba(
                 d_model=dim,
                 d_state=d_state,
@@ -165,7 +167,18 @@ class HybridMambaLLM(nn.Module):
         self.lm_head.weight = self.embedding.weight
         
         # Initialize weights
-        self.apply(_init_weights)
+        if MAMBA_AVAILABLE:
+            self.apply(_init_weights)
+        else:
+            # Fallback initialization
+            def init_weights(module):
+                if isinstance(module, nn.Linear):
+                    nn.init.xavier_uniform_(module.weight)
+                    if module.bias is not None:
+                        nn.init.zeros_(module.bias)
+                elif isinstance(module, nn.Embedding):
+                    nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            self.apply(init_weights)
         
     def forward(self, input_ids, inference_params=None):
         """

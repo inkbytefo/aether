@@ -45,6 +45,15 @@ def test_linear_attention_no_nan():
 
 def test_hybrid_block_mamba():
     """Test HybridBlock with Mamba mixer."""
+    try:
+        from src.models.hybrid_mamba import MAMBA_AVAILABLE
+        if not MAMBA_AVAILABLE:
+            print("⏭️  Skipping Mamba test (mamba_ssm not installed)")
+            return
+    except:
+        print("⏭️  Skipping Mamba test (mamba_ssm not installed)")
+        return
+    
     layer = HybridBlock(dim=512, block_type='mamba', d_state=16)
     x = torch.randn(2, 64, 512)
     
