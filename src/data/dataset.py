@@ -113,39 +113,35 @@ def create_dataloaders(
     tokenizer: Optional[Tokenizer] = None
 ):
     # Initialize tokenizer if not provided
-    # Initialize tokenizer if not provided
     if tokenizer is None:
         tokenizer_path = getattr(config.data, "tokenizer_path", "data/tokenizer.model")
         if os.path.exists(tokenizer_path):
             print(f"Loading tokenizer from {tokenizer_path}")
-            tokenizer = Tokenizer(model_path=tokenizer_path, max_length=config.data.max_length)
+            tokenizer = Tokenizer(model_path=tokenizer_path)
         else:
-            print(f"Warning: Tokenizer not found at {tokenizer_path}. Using default/empty tokenizer.")
-            # This might fail if Tokenizer requires a model_path. 
-            # Our new Tokenizer DOES require a model_path.
-            # So we should probably raise an error or try to find it.
-            raise FileNotFoundError(f"Tokenizer model not found at {tokenizer_path}. Please run prepare_tr_corpus.py first.")
+            raise FileNotFoundError(f"Tokenizer not found at {tokenizer_path}")
     
-    if config.data.dataset_name == "roneneldan/TinyStories":
+    # Detect data format: Binary (.bin files) or Legacy (dataset_paths)
+    if hasattr(config.data, 'train_path') and config.data.train_path:
+        # New binary format (from prepare_phase1_optimized.py)
+        print(f"Using binary datasets: {config.data.train_path}, {config.data.val_path}")
+        train_dataset = BinaryDataset(config.data.train_path, max_length=config.data.seq_length)
+        val_dataset = BinaryDataset(config.data.val_path, max_length=config.data.seq_length)
+    
+    elif config.data.dataset_name == "roneneldan/TinyStories":
         train_dataset = TinyStoriesDataset(split="train", tokenizer=tokenizer, max_length=config.data.max_length)
         val_dataset = TinyStoriesDataset(split="validation", tokenizer=tokenizer, max_length=config.data.max_length)
-    elif config.data.dataset_name in ["phase1_tr", "phase2_mixed"]:
-        # Use BinaryDataset for our custom pre-processed data
-        train_path = config.data.dataset_paths[0]
-        val_path = config.data.dataset_paths[1]
-        
-        train_dataset = BinaryDataset(train_path, max_length=config.data.max_length)
-        val_dataset = BinaryDataset(val_path, max_length=config.data.max_length)
-    else:
-        # Assume list of paths for MixedDataset
-        # Config.data.dataset_name can be a list or string in yaml
-        paths = config.data.dataset_paths if hasattr(config.data, 'dataset_paths') else []
-        
-        # Simple split for now: 90% train, 10% val
+    
+    elif hasattr(config.data, 'dataset_paths') and config.data.dataset_paths:
+        # Legacy format (JSONL)
+        paths = config.data.dataset_paths
         full_dataset = MixedDataset(data_paths=paths, tokenizer=tokenizer, max_length=config.data.max_length)
         train_size = int(0.9 * len(full_dataset))
         val_size = len(full_dataset) - train_size
         train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+    
+    else:
+        raise ValueError("No valid data source found in config. Need train_path+val_path or dataset_name or dataset_paths")
     
     train_loader = DataLoader(
         train_dataset,
@@ -160,10 +156,9 @@ def create_dataloaders(
         val_dataset,
         batch_size=config.training.batch_size,
         shuffle=False,
-        num_workers=4,  # ↑ 2x for faster I/O
+        num_workers=2,
         persistent_workers=True,
-        pin_memory=True,
-        prefetch_factor=2
+        pin_memory=True
     )
     
     return train_loader, val_loader, tokenizer
