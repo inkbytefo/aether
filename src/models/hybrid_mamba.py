@@ -166,19 +166,19 @@ class HybridMambaLLM(nn.Module):
         # Weight Tying
         self.lm_head.weight = self.embedding.weight
         
-        # Initialize weights
-        if MAMBA_AVAILABLE:
-            self.apply(_init_weights)
-        else:
-            # Fallback initialization
-            def init_weights(module):
-                if isinstance(module, nn.Linear):
-                    nn.init.xavier_uniform_(module.weight)
-                    if module.bias is not None:
-                        nn.init.zeros_(module.bias)
-                elif isinstance(module, nn.Embedding):
-                    nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            self.apply(init_weights)
+        # Initialize weights (custom function to avoid signature mismatch)
+        def init_weights(module):
+            if isinstance(module, nn.Linear):
+                nn.init.normal_(module.weight, mean=0.0, std=0.02)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.Embedding):
+                nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            elif isinstance(module, nn.LayerNorm):
+                nn.init.ones_(module.weight)
+                nn.init.zeros_(module.bias)
+        
+        self.apply(init_weights)
         
     def forward(self, input_ids, inference_params=None):
         """
