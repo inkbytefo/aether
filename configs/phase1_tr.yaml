@@ -1,7 +1,7 @@
 model:
   d_model: 256
   n_layer: 6
-  vocab_size: 32000
+  vocab_size: 50257  # Updated to match SentencePiece tokenizer
   ssm_cfg:
     d_state: 16
     d_conv: 4
@@ -14,10 +14,13 @@ training:
   max_steps: 10000
   seed: 42
   device: "cuda"
+  gradient_accumulation_steps: 4
+  max_grad_norm: 1.0
 
 data:
   dataset_name: "phase1_tr"
   max_length: 512
+  tokenizer_path: "data/corpus_v1/tokenizer.model"  # Added tokenizer path
   dataset_paths:
-    - "data/phase1_tr/train.bin"
-    - "data/phase1_tr/val.bin"
+    - "data/corpus_v1/train.bin"  # Updated to match prepare_phase1_tr.py output
+    - "data/corpus_v1/val.bin"

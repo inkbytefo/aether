@@ -1,4 +1,4 @@
-torch>=2.5.1
+torch==2.4.0
 mamba-ssm>=2.2.2
 causal-conv1d>=1.4.0
 transformers>=4.46.0

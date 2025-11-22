@@ -1,92 +1,167 @@
 ## Developer: inkbytefo
-## Modified: 2025-11-21
+## Modified: 2025-11-22
 
-# CUDA Device-Side Assert Fix
+# CUDA Toolkit Kurulum Kılavuzu (mamba-ssm için)
 
-## Problem
+## Durum Tespiti
+```bash
+# GPU ve Driver Kontrolü
+nvidia-smi
+# ✅ CUDA Version: 12.8 (Driver desteği)
+# ✅ GPU: Tesla T4 (15GB VRAM)
 
+# NVCC Kontrolü (Conda Env İçinde)
+nvcc --version
+# ❌ Beklenen Hata: command not found
 ```
-RuntimeError: Triton Error [CUDA]: device-side assert triggered
+
+---
+
+## Çözüm 1: CUDA Toolkit Kurulumu (Önerilen)
+
+### Adım 1: CUDA Toolkit Kurulumu
+```bash
+conda activate aether
+conda install -c nvidia cuda-toolkit=12.8 cuda-nvcc=12.8 -y
 ```
 
-**Root Cause:** Special tokens (PAD, BOS, EOS, UNK) were assigned token IDs **32000-32003**, which are **out of bounds** for a model with `vocab_size=32000` (valid range: 0-31999).
+### Adım 2: Environment Variables (Kalıcı)
+```bash
+# ~/.bashrc dosyasına ekleyin
+cat >> ~/.bashrc << 'EOF'
 
-## Why This Happened
+# CUDA Environment for Aether
+if [[ "$CONDA_DEFAULT_ENV" == "aether" ]]; then
+    export CUDA_HOME=$CONDA_PREFIX
+    export PATH=$CUDA_HOME/bin:$PATH
+    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+    export CUDA_VISIBLE_DEVICES=0
+fi
+EOF
 
-During tokenizer training with `BpeTrainer`, special tokens should have been placed at indices 0-3. However, HuggingFace's `add_special_tokens()` method was called AFTER training, appending them beyond the vocabulary boundary.
+# Aktivasyon
+source ~/.bashrc
+conda deactivate && conda activate aether
+```
 
-## Solution
+### Adım 3: NVCC Doğrulama
+```bash
+nvcc --version
+# Beklenen: Cuda compilation tools, release 12.8
+```
 
-### Option 1: Retrain Tokenizer (RECOMMENDED)
+### Adım 4: mamba-ssm Kurulumu
+```bash
+pip install mamba-ssm --no-build-isolation -v
+```
+
+**Flags Açıklaması:**
+- `--no-build-isolation`: Pip'in kendi build env yerine conda env kullanır
+- `-v`: Verbose output (hata durumunda debug için)
+
+---
+
+## Çözüm 2: Pre-compiled Wheel (Hızlı Alternatif)
+
+Eğer derleme sorunları devam ederse:
 
 ```bash
-python retrain_tokenizer.py
+# Causal-Conv1D bağımlılığı
+pip install causal-conv1d>=1.4.0
+
+# Mamba-SSM (pre-built)
+pip install mamba-ssm --find-links https://github.com/state-spaces/mamba/releases
 ```
 
-This will:
-- Train a new tokenizer with 32000 vocab size
-- **Correctly** place special tokens at indices 0-3
-- Validate the result
-- Save to `data/phase1_tr/tokenizer.json`
+---
 
-After retraining, you'll need to retrain your model from scratch since the token mappings will change.
-
-### Option 2: Temporary Workaround (CURRENT STATE)
-
-The code now includes:
-
-1. **Validation on load** ([`tokenizer.py:82-107`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/src/data/tokenizer.py#L82-L107))
-   - Detects out-of-bounds special token IDs
-   - Warns user to retrain
-
-2. **Token ID clamping** ([`tokenizer.py:189-198`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/src/data/tokenizer.py#L189-L198))
-   - Clamps any token ID >= vocab_size to valid range
-   - Prevents CUDA errors but **corrupts input semantics**
-
-3. **Compatibility check** ([`inference.py:118-129`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/inference.py#L118-L129))
-   - Compares model vs tokenizer vocab_size
-   - Exits early if mismatch detected
-
-## Current Status
-
-✅ **Inference runs without crashing**  
-⚠️ **Output quality is poor** (clamping corrupts special tokens)  
-🔧 **Action Required:** Retrain tokenizer for proper fix
-
-## Diagnostic Tool
+## Doğrulama
 
 ```bash
-python diagnose_tokenizer.py
+python -c "
+import torch
+import mamba_ssm
+print(f'PyTorch: {torch.__version__}')
+print(f'CUDA Available: {torch.cuda.is_available()}')
+print(f'Mamba-SSM: {mamba_ssm.__version__}')
+print(f'GPU: {torch.cuda.get_device_name(0)}')
+"
 ```
 
-Shows:
-- Actual vocab size
-- Special token IDs
-- Sample encoding test
-- Validates token ID ranges
-
-## Expected Output After Retraining
-
+**Beklenen Çıktı:**
 ```
-PAD token: '<pad>' -> ID 0
-UNK token: '<unk>' -> ID 1
-BOS token: '<s>' -> ID 2
-EOS token: '</s>' -> ID 3
+PyTorch: 2.9.1+cu128
+CUDA Available: True
+Mamba-SSM: 2.2.6
+GPU: Tesla T4
 ```
 
-## Files Modified
+---
 
-1. [`src/data/tokenizer.py`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/src/data/tokenizer.py)
-   - Added vocab_size sync in `_load_pretrained()`
-   - Added validation in `_configure_special_tokens()`
-   - Added token ID clamping in `encode()`
-   - Fixed `__len__()` to return actual vocab size
+## Sorun Giderme
 
-2. [`inference.py`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/inference.py)
-   - Added vocab_size compatibility check
+### Hata: "CUDA mismatch"
+```bash
+# PyTorch CUDA version kontrolü
+python -c "import torch; print(torch.version.cuda)"
 
-3. [`retrain_tokenizer.py`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/retrain_tokenizer.py) [NEW]
-   - Standalone script to retrain tokenizer correctly
+# Toolkit version eşleştirme
+conda install cuda-toolkit=$(python -c "import torch; print(torch.version.cuda)")
+```
 
-4. [`diagnose_tokenizer.py`](file:///c:/Users/tpoyr/OneDrive/Desktop/AETHER/diagnose_tokenizer.py) [NEW]
-   - Diagnostic utility for tokenizer issues
+### Hata: "ninja: build stopped"
+```bash
+# Ninja build system kurulumu
+conda install ninja -y
+pip install mamba-ssm --no-build-isolation
+```
+
+### Hata: "causal_conv1d not found"
+```bash
+pip install causal-conv1d --no-build-isolation
+pip install mamba-ssm --no-build-isolation
+```
+
+---
+
+## Notlar
+
+1. **Conda vs System CUDA:** Conda env içi kurulum → izolasyon + reproducibility
+2. **Build Time:** İlk kurulum ~5-10 dakika sürebilir (CUDA kernels derleniyor)
+3. **Memory:** Build sırasında ~2GB RAM kullanımı normal
+4. **Brev.dev Persistence:** Instance geçiciyse, bu adımları `setup.sh` olarak kaydedin
+
+---
+
+## Hızlı Kurulum Scripti
+
+```bash
+#!/bin/bash
+# setup_cuda.sh
+
+set -e
+
+echo "=== CUDA Toolkit Kurulumu ==="
+conda install -c nvidia cuda-toolkit=12.8 cuda-nvcc=12.8 -y
+
+echo "=== Environment Variables ==="
+export CUDA_HOME=$CONDA_PREFIX
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+echo "=== NVCC Doğrulama ==="
+nvcc --version
+
+echo "=== Mamba-SSM Kurulumu ==="
+pip install causal-conv1d --no-build-isolation
+pip install mamba-ssm --no-build-isolation -v
+
+echo "=== Test ==="
+python -c "import mamba_ssm; print('✅ Mamba-SSM kuruldu!')"
+```
+
+**Kullanım:**
+```bash
+chmod +x setup_cuda.sh
+./setup_cuda.sh
+```
