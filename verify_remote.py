@@ -67,7 +67,7 @@ def verify_remote():
     try:
         model.eval()
         prompt = "Yapay zeka"
-        input_ids = torch.tensor([tokenizer.encode(prompt)['input_ids']], device=device)
+        input_ids = tokenizer.encode(prompt)['input_ids'].to(device)
         
         with torch.no_grad():
             # Simple generation loop
@@ -75,7 +75,7 @@ def verify_remote():
             for _ in range(20):
                 outputs = model(generated)
                 next_token_logits = outputs.logits[:, -1, :]
-                next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(0)
+                next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(1) # unsqueeze(1) for [batch, 1]
                 generated = torch.cat((generated, next_token), dim=1)
         
         decoded = tokenizer.decode(generated[0].tolist())
