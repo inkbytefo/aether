@@ -1,3 +1,6 @@
+## Developer: inkbytefo
+## Modified: 2025-11-22
+
 import yaml
 from dataclasses import dataclass
 from typing import Optional
@@ -32,8 +35,10 @@ class TrainingConfig:
     batch_size: int
     learning_rate: float
     max_steps: int
-    seed: int
     device: str
+    
+    # Training parameters
+    seed: int = 42
     sequence_len: int = 2048
     min_lr: float = 1e-5
     warmup_steps: int = 1000
