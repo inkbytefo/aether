@@ -32,19 +32,29 @@ class ModelConfig:
 
 @dataclass
 class TrainingConfig:
-    batch_size: int
     learning_rate: float
     max_steps: int
     device: str
     
-    # Training parameters
+    # Optimizer settings
+    optimizer: str = "AdamW"
+    weight_decay: float = 0.1
+    beta1: float = 0.9
+    beta2: float = 0.95
+    
+    # Scheduler settings
+    scheduler: str = "cosine"
+    warmup_steps: int = 1000
+    min_lr: float = 1e-5
+    
+    # Batch settings
+    batch_size: int = 8
+    gradient_accumulation_steps: int = 1
+    
+    # Training control
+    max_grad_norm: float = 1.0
     seed: int = 42
     sequence_len: int = 2048
-    min_lr: float = 1e-5
-    warmup_steps: int = 1000
-    weight_decay: float = 0.1
-    gradient_accumulation_steps: int = 1
-    max_grad_norm: float = 1.0
     save_steps: int = 1000
     eval_steps: int = 100
 
