@@ -1,17 +1,19 @@
 ## Developer: inkbytefo
 ## Modified: 2025-11-22
 
-# Hybrid Mamba-Attention Configuration (Phase 1 - Production)
+# Hybrid Mamba-Attention Configuration - T4 GPU Optimized (16GB VRAM)
 # Architecture: Jamba-style (Mamba + Linear Attention)
+# Estimated Model Size: ~500M parameters
+# Peak VRAM Usage: ~12GB (with FP16 mixed precision)
 
 model:
   vocab_size: 50257
-  d_model: 768
-  n_layer: 24
-  d_state: 16
-  d_conv: 4
-  expand: 2
-  use_plasticity: false  # Not needed - using Linear Attention instead
+  d_model: 768         # Hidden dimension
+  n_layer: 24          # Total layers (16 Mamba + 8 Attention)
+  d_state: 16          # SSM state dimension
+  d_conv: 4            # Convolution kernel size
+  expand: 2            # Expansion factor for MLP
+  use_plasticity: false
   
   # Hybrid-specific
   attention_interval: 3  # Every 3rd layer is Linear Attention
@@ -20,15 +22,15 @@ data:
   train_path: "data/corpus_v1/train.bin"
   val_path: "data/corpus_v1/val.bin"
   tokenizer_path: "data/corpus_v1/tokenizer.model"
-  seq_length: 1024
-  batch_size: 8
+  seq_length: 512      # T4 optimized (was 1024)
+  batch_size: 10       # T4 optimized (was 8)
 
 training:
-  max_steps: 50000
-  learning_rate: 3.0e-4
+  max_steps: 100000    # Increased for better convergence
+  learning_rate: 4.0e-4
   weight_decay: 0.1
   warmup_steps: 2000
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 8  # Effective batch = 10 * 8 = 80
   max_grad_norm: 1.0
   device: "cuda"
   
@@ -39,7 +41,7 @@ training:
   
   # Scheduler
   scheduler: "cosine"
-  min_lr: 3.0e-5
+  min_lr: 5.0e-6
 
 logging:
   log_interval: 10
