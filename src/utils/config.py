@@ -28,6 +28,8 @@ class TrainingConfig:
     weight_decay: float = 0.1
     gradient_accumulation_steps: int = 1
     max_grad_norm: float = 1.0
+    save_steps: int = 1000
+    eval_steps: int = 100
 
 @dataclass
 class DataConfig:
